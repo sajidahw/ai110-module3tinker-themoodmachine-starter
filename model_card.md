@@ -12,13 +12,16 @@ You may complete this model card for whichever version you used, or compare both
 **Model type:**  
 Describe whether you used the rule based model, the ML model, or both.  
 Example: “I used the rule based model only” or “I compared both models.”
+I used both, but only updated the rule based model with new posts and labels as well as logic updates. The ML model was trained on the same data but not updated with new posts.
 
 **Intended purpose:**  
 What is this model trying to do?  
 Example: classify short text messages as moods like positive, negative, neutral, or mixed.
+It takes a user's sentence and classifies it as positive, negative, neutral, or mixed based off of recognizing words, phrases, and emojis that are associated with each mood.
 
 **How it works (brief):**  
 For the rule based version, describe the scoring rules you created.  
+Scoring rules are based on the presence of positive and negative words, negation handling, and emoji interpretation. Each post is scored based on these factors, and thresholds are set to determine the final mood classification.
 For the ML version, describe how training works at a high level (no math needed).
 
 
@@ -27,10 +30,12 @@ For the ML version, describe how training works at a high level (no math needed)
 
 **Dataset description:**  
 Summarize how many posts are in `SAMPLE_POSTS` and how you added new ones.
+There were originally 6 and I added 5 more samples to the dataset.
 
 **Labeling process:**  
 Explain how you chose labels for your new examples.  
 Mention any posts that were hard to label or could have multiple valid labels.
+I also added new words to the positive and negative word lists. For mixed phrases which could be ambiguous or sarcasm, I did not try to label them. I did add more words to the list depending on if I felt it tends to be explicitly recognized as positive or negative. I also added more emojis to the list of positive and negative emojis.
 
 **Important characteristics of your dataset:**  
 Examples you might include:  
@@ -41,7 +46,7 @@ Examples you might include:
 - Contains short or ambiguous messages
 
 **Possible issues with the dataset:**  
-Think about imbalance, ambiguity, or missing kinds of language.
+Think about imbalance, ambiguity, or missing kinds of language. Seemed to run into ambiguity with sarcasm, and certain type of slang like "ain't".
 
 ## 3. How the Rule Based Model Works (if used)
 
@@ -57,10 +62,12 @@ Examples:
 
 **Strengths of this approach:**  
 Where does it behave predictably or reasonably well?
+It works pretty well if the post is clearly positive or negative, and it can handle some negation and emojis. It also works well for posts that are short and to the point.
 
 **Weaknesses of this approach:**  
 Where does it fail?  
 Examples: sarcasm, subtlety, mixed moods, unfamiliar slang.
+It cannot recognize sarcasm, unfamiliar slang, or mixed moods. It also struggles with longer posts that have multiple sentences and ideas.
 
 ## 4. How the ML Model Works (if used)
 
@@ -83,13 +90,27 @@ Weaknesses might include overfitting to the training data or picking up spurious
 **How you evaluated the model:**  
 Both versions can be evaluated on the labeled posts in `dataset.py`.  
 Describe what accuracy you observed.
+I observed that the ML version had a higher accuracy than the rule based version, but both models struggled with certain types of posts, especially those that were sarcastic or contained mixed emotions or unknown slang.
 
 **Examples of correct predictions:**  
 Provide 2 or 3 examples and explain why they were correct.
+You: i ain't sad
+ML model: negative
+
+You: no cap this week has been rough
+ML model: negative
 
 **Examples of incorrect predictions:**  
 Provide 2 or 3 examples and explain why the model made a mistake.  
 If you used both models, show how their failures differed.
+You: i ain't sad
+ML model: negative
+
+You: i absolutely love getting stuck in traffic for two hours
+Model: positive
+
+You: pretty fly weather today
+Model: neutral
 
 ## 6. Limitations
 

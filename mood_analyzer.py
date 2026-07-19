@@ -9,9 +9,34 @@ This class starts with very simple logic:
   - Convert that score into a mood label
 """
 
+import re
+import string
 from typing import List, Dict, Tuple, Optional
 
 from dataset import POSITIVE_WORDS, NEGATIVE_WORDS
+
+# Emoticons (":)", ":-(", ";d") and emoji unicode ranges (pictographs, misc
+# symbols/dingbats, regional indicators). Matched against already-lowercased
+# text, so uppercase emoticon letters like ":D" won't appear here.
+_EMOJI_OR_EMOTICON = re.compile(
+    r"(:-?\)|:-?\(|:'\(|:-?d|:-?p|;-?\)|"
+    r"[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001F1FF])"
+)
+
+# Collapses runs of 3+ identical characters down to 2 (e.g. "soooo" ->
+# "soo"). Stopping at 2 (not 1) avoids corrupting real double letters
+# like "good" or "happy", which never repeat a letter 3+ times.
+_REPEATED_CHARS = re.compile(r"(.)\1{2,}")
+
+# Words that flip the sentiment of the token immediately following them
+# (e.g. "not happy", "never fun"). Only the directly adjacent word is
+# flipped -- "not very happy" won't negate "happy" since "very" sits
+# between them.
+_NEGATION_WORDS = {
+    "not", "no", "never", "cannot",
+    "don't", "doesn't", "didn't", "won't", "wouldn't",
+    "can't", "couldn't", "isn't", "wasn't", "aren't", "weren't",
+}
 
 
 class MoodAnalyzer:
@@ -53,13 +78,78 @@ class MoodAnalyzer:
           - Normalize repeated characters ("soooo" -> "soo")
         """
         cleaned = text.strip().lower()
+
+        # Separate emojis/emoticons from adjacent words or other emojis
+        # (e.g. "good:)" or "😂🔥") so each becomes its own token.
+        cleaned = _EMOJI_OR_EMOTICON.sub(lambda m: f" {m.group(0)} ", cleaned)
+
         tokens = cleaned.split()
+
+        # Strip leading/trailing punctuation from word tokens (e.g. "day."
+        # -> "day"), but leave emoticon tokens like ":)" untouched since
+        # they're built entirely out of punctuation characters.
+        tokens = [
+            token if _EMOJI_OR_EMOTICON.fullmatch(token) else token.strip(string.punctuation)
+            for token in tokens
+        ]
+        tokens = [token for token in tokens if token]
+
+        # Normalize elongated slang (e.g. "soooo" -> "soo"), skipping
+        # emoticon tokens so they aren't altered.
+        tokens = [
+            token if _EMOJI_OR_EMOTICON.fullmatch(token) else _REPEATED_CHARS.sub(r"\1\1", token)
+            for token in tokens
+        ]
 
         return tokens
 
     # ---------------------------------------------------------------------
     # Scoring logic
     # ---------------------------------------------------------------------
+
+    def _score_and_hits(self, text: str) -> Tuple[int, int, int]:
+        """
+        Shared scoring pass used by both score_text() and predict_label().
+
+        Returns (score, positive_hits, negative_hits), where positive_hits
+        and negative_hits count contributions AFTER negation is applied
+        (e.g. "not bad" counts as a positive hit, not a negative one).
+        Tracking both hit counts (not just the net score) is what lets
+        predict_label() tell a truly neutral post ("This is fine") apart
+        from one with cancelling positive and negative signals ("mixed").
+        """
+        tokens = self.preprocess(text)
+
+        score = 0
+        positive_hits = 0
+        negative_hits = 0
+        skip_next = False
+        for i, token in enumerate(tokens):
+            if skip_next:
+                skip_next = False
+                continue
+
+            if token in _NEGATION_WORDS and i + 1 < len(tokens):
+                next_token = tokens[i + 1]
+                if next_token in self.positive_words:
+                    score -= 1
+                    negative_hits += 1
+                    skip_next = True
+                    continue
+                elif next_token in self.negative_words:
+                    score += 1
+                    positive_hits += 1
+                    skip_next = True
+                    continue
+
+            if token in self.positive_words:
+                score += 1
+                positive_hits += 1
+            elif token in self.negative_words:
+                score -= 1
+                negative_hits += 1
+
+        return score, positive_hits, negative_hits
 
     def score_text(self, text: str) -> int:
         """
@@ -75,15 +165,8 @@ class MoodAnalyzer:
           - Give some words higher weights than others (for example "hate" < "annoyed")
           - Treat emojis or slang (":)", "lol", "💀") as strong signals
         """
-        # TODO: Implement this method.
-        #   1. Call self.preprocess(text) to get tokens.
-        #   2. Loop over the tokens.
-        #   3. Increase the score for positive words, decrease for negative words.
-        #   4. Return the total score.
-        #
-        # Hint: if you implement negation, you may want to look at pairs of tokens,
-        # like ("not", "happy") or ("never", "fun").
-        pass
+        score, _, _ = self._score_and_hits(text)
+        return score
 
     # ---------------------------------------------------------------------
     # Label prediction
@@ -93,24 +176,26 @@ class MoodAnalyzer:
         """
         Turn the numeric score for a piece of text into a mood label.
 
-        The default mapping is:
-          - score > 0  -> "positive"
-          - score < 0  -> "negative"
-          - score == 0 -> "neutral"
+        The mapping is:
+          - both positive and negative words present -> "mixed"
+          - score > 0                                -> "positive"
+          - score < 0                                -> "negative"
+          - score == 0, no sentiment words found      -> "neutral"
 
-        TODO: You can adjust this mapping if it makes sense for your model.
-        For example:
-          - Use different thresholds (for example score >= 2 to be "positive")
-          - Add a "mixed" label for scores close to zero
-        Just remember that whatever labels you return should match the labels
-        you use in TRUE_LABELS in dataset.py if you care about accuracy.
+        "mixed" is checked first so that cancelling signals (e.g. one
+        positive word and one negative word, net score 0) are told apart
+        from truly neutral text with no sentiment words at all.
         """
-        # TODO: Implement this method.
-        #   1. Call self.score_text(text) to get the numeric score.
-        #   2. Return "positive" if the score is above 0.
-        #   3. Return "negative" if the score is below 0.
-        #   4. Return "neutral" otherwise.
-        pass
+        score, positive_hits, negative_hits = self._score_and_hits(text)
+
+        if positive_hits > 0 and negative_hits > 0:
+            return "mixed"
+        elif score > 0:
+            return "positive"
+        elif score < 0:
+            return "negative"
+        else:
+            return "neutral"
 
     # ---------------------------------------------------------------------
     # Explanations (optional but recommended)

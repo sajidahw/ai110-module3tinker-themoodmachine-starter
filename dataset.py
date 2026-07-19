@@ -23,6 +23,13 @@ POSITIVE_WORDS = [
     "chill",
     "relaxed",
     "amazing",
+    "hopeful",
+    "favorite",
+    "😂",
+    "😍",
+    "😊",
+    "🔥",
+    "❤️",
 ]
 
 NEGATIVE_WORDS = [
@@ -36,6 +43,11 @@ NEGATIVE_WORDS = [
     "stressed",
     "hate",
     "boring",
+    "sucked",
+    "rough",
+    "😢",
+    "😡",
+    "😩",
 ]
 
 # ---------------------------------------------------------------------
@@ -50,6 +62,11 @@ SAMPLE_POSTS = [
     "This is fine",
     "So excited for the weekend",
     "I am not happy about this",
+    "ngl today kinda sucked but at least i got food 🥲",
+    "lowkey obsessed with this playlist rn 😂🔥",
+    "I absolutely love getting stuck in traffic for two hours",
+    "no cap this week has been rough",
+    "just vibing, nothing special happening tbh",
 ]
 
 # Human labels for each post above.
@@ -65,6 +82,11 @@ TRUE_LABELS = [
     "neutral",   # "This is fine"
     "positive",  # "So excited for the weekend"
     "negative",  # "I am not happy about this"
+    "mixed",     # "ngl today kinda sucked but at least i got food 🥲"
+    "positive",  # "lowkey obsessed with this playlist rn 😂🔥"
+    "negative",  # "I absolutely love getting stuck in traffic for two hours" (sarcasm)
+    "negative",  # "no cap this week has been rough"
+    "neutral",   # "just vibing, nothing special happening tbh"
 ]
 
 # TODO: Add 5-10 more posts and labels.
